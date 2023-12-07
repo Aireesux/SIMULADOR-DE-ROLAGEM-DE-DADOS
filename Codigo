@@ -1,0 +1,198 @@
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QPushButton, QTextEdit, QInputDialog, QDialog, QLabel, QHBoxLayout
+from PyQt5.QtGui import QTextCharFormat, QTextCursor
+from PyQt5.QtCore import Qt
+
+import random
+
+class DiceSimulatorGUI(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.init_ui()
+        self.results = []  # Lista para armazenar os resultados e informações associadas
+
+    def init_ui(self):
+        self.setWindowTitle('Simulador de Dados D6')
+
+        self.result_text = QTextEdit(self)
+        self.result_text.setReadOnly(True)
+        self.result_text.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
+        roll_button = QPushButton('Rolar Dados', self)
+        roll_button.clicked.connect(self.roll_dice)
+
+        filter_button = QPushButton('Filtrar Resultados', self)
+        filter_button.clicked.connect(self.show_filter_dialog)
+
+
+
+        exit_button = QPushButton('Sair', self)
+        exit_button.clicked.connect(self.close)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(roll_button)
+        layout.addWidget(filter_button)
+        layout.addWidget(exit_button)
+        layout.addWidget(self.result_text)
+
+        self.show()
+
+    def roll_dice(self):
+        num_dice, ok_pressed = QInputDialog.getInt(self, 'Quantidade de Dados', 'Quantos dados quer rolar?', 1, 1)
+        if ok_pressed:
+            dice_results = [random.randint(1, 6) for _ in range(num_dice)]
+            self.show_results(dice_results)
+
+    def is_prime(self, num):
+        if num < 2:
+            return False
+        for i in range(2, int(num**0.5) + 1):
+            if num % i == 0:
+                return False
+        return True
+
+    def interpret_results(self, results):
+        messages = []
+        for result in results:
+            index, value = result
+            message = f"Dado {index}: {value} - "
+            if value == 6:
+                message += "Acerto Crítico!"
+                self.append_colored_text(message, Qt.green)
+            elif value == 1 or value == 2 or value == 3 or value == 4:
+                message += "Falha!"
+                self.append_colored_text(message, Qt.red)
+            elif value == 5:
+                message += "Acerto Padrão."
+                self.append_colored_text(message, Qt.green)
+
+    def show_results(self, results):
+        self.results = list(enumerate(results, start=1))  # Armazena os resultados com informações do dado
+        self.result_text.clear()
+        self.interpret_results(self.results)
+
+    def show_filter_dialog(self):
+        filter_option, ok_pressed = QInputDialog.getItem(self, 'Opções de Filtro', 'Escolha uma opção para filtrar os resultados:',
+                                                         ["Pares", "Ímpares", "Números"], 0, False)
+        if ok_pressed:
+            current_text = self.result_text.toPlainText().strip()
+            if not current_text:
+                return
+
+            current_results = self.results
+
+            if filter_option == "Pares":
+                filtered_results = [result for result in current_results if result[1] % 2 == 0]
+            elif filter_option == "Ímpares":
+                filtered_results = [result for result in current_results if result[1] % 2 != 0]
+            else:  # Números
+                filter_dialog = NumberFilterDialog(self, current_results)
+                filter_dialog.exec_()
+
+    def show_count_dialog(self):
+        number, ok_pressed = QInputDialog.getInt(self, 'Contar Número', 'Digite o número que deseja contar:')
+        if ok_pressed:
+            count = sum(1 for _, value in self.results if value == number)
+            self.show_count_results(number, count)
+
+    def show_count_results(self, number, count):
+        count_dialog = CountResultsDialog(number, count)
+        count_dialog.exec_()
+
+    def append_colored_text(self, text, color):
+        cursor = self.result_text.textCursor()
+        cursor.movePosition(QTextCursor.End)
+
+        format_ = QTextCharFormat()
+        format_.setForeground(color)
+
+        cursor.insertText(text, format_)
+        self.result_text.setTextCursor(cursor)
+
+
+class NumberFilterDialog(QDialog):
+    def __init__(self, parent, results):
+        super().__init__(parent)
+
+        self.setWindowTitle('Filtrar por Números')
+        self.setGeometry(100, 100, 400, 300)
+
+        self.result_text = QTextEdit(self)
+        self.result_text.setReadOnly(True)
+        self.result_text.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
+        self.number_buttons = [QPushButton(str(i)) for i in range(1, 7)]
+        for button in self.number_buttons:
+            button.clicked.connect(self.show_number_count)
+
+        exit_button = QPushButton('Sair', self)
+        exit_button.clicked.connect(self.close)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.result_text)
+
+        numbers_layout = QHBoxLayout()
+        for button in self.number_buttons:
+            numbers_layout.addWidget(button)
+
+        layout.addLayout(numbers_layout)
+        layout.addWidget(exit_button)
+
+        self.results = results
+
+    def show_number_count(self):
+        sender = self.sender()
+        number = int(sender.text())
+        count = sum(1 for _, value in self.results if value == number)
+        self.result_text.clear()
+        self.result_text.append(f'O número {number} apareceu {count} vezes nos dados.')
+
+class FilteredResultsDialog(QDialog):
+    def __init__(self, results):
+        super().__init__()
+
+        self.setWindowTitle('Resultados Filtrados')
+        self.setGeometry(100, 100, 400, 300)
+
+        self.result_text = QTextEdit(self)
+        self.result_text.setReadOnly(True)
+        self.result_text.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
+        self.count_label = QLabel(self)
+        self.count_label.setAlignment(Qt.AlignRight)
+
+        exit_button = QPushButton('Sair', self)
+        exit_button.clicked.connect(self.close)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.result_text)
+        layout.addWidget(self.count_label)
+        layout.addWidget(exit_button)
+
+        self.show_results(results)
+
+    def show_results(self, results):
+        count_dict = {}  # Dicionário para contar a ocorrência de cada número
+        for result in results:
+            index, value = result
+            message = f"Dado {index}: {value}"
+            self.append_text(message)
+
+            # Contar ocorrência de cada número
+            count_dict[value] = count_dict.get(value, 0) + 1
+
+        # Exibir contagem na label
+        count_text = "\n".join([f'Número {key}: {value} vezes' for key, value in count_dict.items()])
+        self.count_label.setText(count_text)
+
+    def append_text(self, text):
+        cursor = self.result_text.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        cursor.insertText(text + '\n')
+        self.result_text.setTextCursor(cursor)
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    dice_simulator = DiceSimulatorGUI()
+    sys.exit(app.exec_())
