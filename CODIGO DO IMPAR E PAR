@@ -1,0 +1,17 @@
+def show_filter_dialog(self):
+        filter_option, ok_pressed = QInputDialog.getItem(self, 'Opções de Filtro', 'Escolha uma opção para filtrar os resultados:',
+                                                         ["Pares", "Ímpares", "Números"], 0, False)
+        if ok_pressed:
+            current_text = self.result_text.toPlainText().strip()
+            if not current_text:
+                return
+
+            current_results = self.results
+
+            if filter_option == "Pares":
+                filtered_results = [result for result in current_results if result[1] % 2 == 0]
+            elif filter_option == "Ímpares":
+                filtered_results = [result for result in current_results if result[1] % 2 != 0]
+            else:  # Números
+                filter_dialog = NumberFilterDialog(self, current_results)
+                filter_dialog.exec_()
